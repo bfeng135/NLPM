@@ -1,0 +1,837 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.nl.pm.server.registry.dao.UserDao">
+    <insert id="insertUserComeDate">
+        insert into user_come_leave(user_id,come_date)
+        values(#{userId},#{comeDate})
+
+    </insert>
+    <update id="updateUserLeaveDate">
+        update user_come_leave set leave_date = #{leaveDate}
+        where user_id = #{userId}
+        and come_date = (select comeDate from (select max(come_date) as comeDate from user_come_leave where user_id = #{userId}) as temp)
+        and leave_date is null
+    </update>
+    <select id="searchUserComeLeaveList" resultType="com.nl.pm.server.registry.entity.UserComeLeaveEntity">
+        select * from user_come_leave
+        <if test="limitUserIds != null and limitUserIds.size()>0">
+            where user_id in
+            <foreach collection="limitUserIds" item="userId" open="(" close=")" separator=",">
+                #{userId}
+            </foreach>
+        </if>
+    </select>
+
+
+
+    <select id="queryUserByRoleCode" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u.*,r.code AS roleCode,r.name AS roleName FROM `user` u
+        LEFT JOIN `role` r ON r.id = u.role_id
+        WHERE u.status = true
+        AND u.email_notice = true
+        <if test="code != null and code !=''">AND r.code = #{code}</if>
+    </select>
+
+    <select id="queryAllUser" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            a.name as areaName,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`
+        FROM
+            `user` as u
+        left join `area` as a on a.id = u.area_id
+
+    </select>
+
+    <select id="queryAllEnableUser" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+        `id`,
+        `username`,
+        `password`,
+        `nickname`,
+        `role_id`,
+        `area_id`,
+        `email`,
+        `phone`,
+        `status`,
+        `email_notice`,
+        `create_time`,
+        `update_time`,
+        `token`
+        FROM
+        `user`
+        where status =1
+
+    </select>
+
+    <select id="queryAllUserNotWriteDaily" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u2.*,a.name as areaName
+        FROM `user` u2
+        left join area as a on a.id = u2.area_id
+        WHERE u2.status = 1
+        AND u2.id NOT IN (SELECT u.id
+                            FROM `user` u
+                            LEFT JOIN `day_report` d ON d.user_id = u.id
+                            WHERE u.role_id IN (SELECT r.id
+                                                FROM role r
+                                                WHERE r.code IN ('AREA_MANAGER','GROUP_MANAGER','EMPLOYEE')
+                                                )
+                            AND d.date =  STR_TO_DATE(#{date,jdbcType=VARCHAR},"%Y-%m-%d")
+                            )
+    </select>
+
+    <select id="getUserByUsernameAndPassword" parameterType="map" resultType="com.nl.pm.server.registry.entity.UserEntity">
+
+        SELECT
+            distinct
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`area_id`,
+            r.`code` as roleCode
+        FROM `user` as u
+        left join `role` as r on u.`role_id` = r.`id`
+        left join `area_user_ass` as aus on aus.`user_id` = u.`id`
+        left join `area` as a on a.`manager_id` = u.`id` and  a.id = aus.area_id
+        WHERE
+            u.`username` = #{username }
+        AND
+            u.`password` = #{password }
+        AND
+            (
+                u.`area_id` = #{areaId}
+                or
+                (
+<!--                    aus.`area_id` = #{areaId}-->
+<!--                    and-->
+<!--                    a.`manager_id` = u.`id`-->
+                        aus.`area_id` = #{areaId}
+                        and
+                        r.`code` in ('AREA_MANAGER','SUPER_ADMIN','FINANCE','HR','MANAGEMENT')
+                )
+            )
+        AND
+            u.`status` = 1
+    </select>
+
+    <select id="loadUserByUsername" parameterType="map" resultType="com.nl.pm.server.registry.entity.UserEntity">
+
+        SELECT
+            distinct
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`area_id`
+        FROM
+        `user` as u
+        left join `role` as r on u.`role_id` = r.`id`
+        left join `area_user_ass` as aus on aus.`user_id` = u.`id`
+        WHERE
+        u.`username` = #{username }
+        AND
+        (
+            u.`area_id` = #{areaId}
+            or
+            (
+                aus.`area_id` = #{areaId}
+                and
+                r.`code` in ('AREA_MANAGER','SUPER_ADMIN','FINANCE','HR','MANAGEMENT')
+            )
+        )
+        AND
+        u.`status` = 1
+    </select>
+
+    <update id="loginTokenUpdate" parameterType="map" >
+        update `user` set token = #{token}
+        where `username` = #{username}
+        AND
+        `status` = 1
+    </update>
+    <update id="logout" parameterType="String" >
+        update `user` set token = ''
+        where `username` = #{username}
+        AND
+        `status` = 1
+    </update>
+
+    <select id="checkTokenExist" parameterType="String" resultType="Integer">
+        select count(`id`) from `user`
+        where `token` = #{token}
+        AND
+        `status` = 1
+    </select>
+    <select id="queryUserByUserName" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            r.code roleCode,
+            a.name areaName
+        FROM
+            `user` u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        WHERE
+            u.`username` = #{userName}
+    </select>
+    <select id="queryUserPagingTest"  resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            a.name areaName
+        FROM
+            `user` u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        <where>
+            <if test="searchVal != null and searchVal != ''">
+                and u.username like concat ('%', #{searchVal}, '%')
+            </if>
+        </where>
+    </select>
+    <select id="queryUserPagingByRoleIds" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            a.name areaName
+        FROM
+            `user` u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        WHERE 1 = 1
+        AND
+            r.id
+        IN
+            <foreach item="item" collection="ids" separator="," open="(" close=")" index="">
+                #{item}
+            </foreach>
+            <if test="searchVal != null and searchVal != ''">
+                and u.username like concat ('%', #{searchVal}, '%')
+            </if>
+        ORDER BY u.create_time DESC
+    </select>
+    <select id="selectUserInfoById" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id` AS roleId,
+            r.`code` as roleCode,
+            u.`area_id` AS areaId,
+            u.`email`,
+            u.`phone`,
+            u.`status` AS status,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            r.code roleCode,
+            a.name areaName
+        FROM
+            `user` u
+            LEFT JOIN `role` r ON u.role_id = r.id
+            LEFT JOIN `area` a ON u.area_id = a.id
+        WHERE 1 = 1
+        AND
+            u.id = #{userId}
+    </select>
+    <select id="selectUserByProjectOrReport" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`
+        FROM
+            `user` u,`day_report` d
+        WHERE
+        EXISTS (SELECT * FROM `user` u,project_user p
+            WHERE p.user_id = u.id
+            AND
+                u.id =  #{userId})
+        AND
+            d.user_id = u.id
+        AND
+            u.id = #{userId}
+        LIMIT 0,1
+    </select>
+
+    <select id="searchUserListByIds" parameterType="map" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        select
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`
+        from `user` as u
+        where u.`id` in
+        <foreach collection="userIdList" item="userId" separator="," open="(" close=")" index="index">
+            #{userId}
+        </foreach>
+
+    </select>
+
+    <select id="queryUserPaging" parameterType="map" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            a.name areaName
+        FROM
+            `user` u
+            LEFT JOIN `role` r ON u.role_id = r.id
+            LEFT JOIN `area` a ON u.area_id = a.id
+        WHERE
+            1 = 1
+        <if test="entityParam.roleId != null and entityParam.roleId != ''">
+            and u.role_id = #{entityParam.roleId}
+        </if>
+        <if test="entityParam.areaId != null and entityParam.areaId != ''">
+            and u.area_id = #{entityParam.areaId}
+        </if>
+        <if test="entityParam.projectId != null and entityParam.projectId != ''">
+            and u.id IN (SELECT DISTINCT(pu.user_id) FROM project_user pu
+            LEFT JOIN project p ON p.id = pu.project_id WHERE p.id = #{entityParam.projectId})
+        </if>
+        <if test="entityParam.nickname != null and entityParam.nickname != ''">
+            and u.nickname = #{entityParam.nickname}
+        </if>
+        <if test="entityParam.searchVal != null and entityParam.searchVal != ''">
+            and u.username like concat ('%', #{entityParam.searchVal}, '%')
+        </if>
+        order by u.status desc
+    </select>
+    <select id="searchUserByRoleOrArea" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            a.name areaName
+        FROM
+            `user` u
+            LEFT JOIN `role` r ON u.role_id = r.id
+            LEFT JOIN `area` a ON u.area_id = a.id
+        WHERE
+            u.status = true
+        <if test="entityParam.areaId != null and entityParam.areaId != ''">
+            and u.area_id = #{entityParam.areaId}
+        </if>
+        <if test="entityParam.listRoleCode != null and entityParam.listRoleCode.size() != 0">
+            and r.code IN
+            <foreach item="item" collection="entityParam.listRoleCode" separator="," open="(" close=")" index="">
+                #{item}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="searchUserByProjectAndArea" parameterType="map" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        select
+            distinct
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            a.name areaName
+        from `user` as u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        LEFT JOIN `area_user_ass` aua ON u.id = aua.`user_id`
+        left join `project_user` as pju on u.`id` = pju.`user_id`
+        <where>
+            <if test="areaId != null">
+                (
+                    u.area_id = #{areaId}
+                    or
+                    aua.area_id = #{areaId}
+                )
+            </if>
+            <if test="userId != null">
+                and
+                    pju.`project_id` in (
+                        select
+                            distinct pu.`project_id`
+                        from `project_user` as pu
+                        where
+                            pu.user_id = #{userId}
+                    )
+            </if>
+        </where>
+
+    </select>
+
+    <select id="queryGroupAllUserNotWriteDailyByTime" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u2.* FROM `user` u2 WHERE u2.id NOT IN (SELECT u.id  FROM `user` u
+        LEFT JOIN `day_report` d ON d.user_id = u.id
+        WHERE u.role_id IN (SELECT r.id FROM role r WHERE r.code IN ('AREA_MANAGER','GROUP_MANAGER','EMPLOYEE'))
+        AND d.date =  STR_TO_DATE(#{time,jdbcType=VARCHAR},"%Y-%m-%d"))
+        AND u2.area_id = #{areaId}
+    </select>
+
+    <select id="queryGroupAllUserNotWriteDailyByTimeAndProject" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u2.* FROM `user` u2
+        LEFT JOIN `project_user` pu ON pu.user_id = u2.id
+        LEFT JOIN `project` p ON p.id = pu.project_id
+        WHERE u2.id NOT IN (SELECT u.id  FROM `user` u
+        LEFT JOIN `day_report` d ON d.user_id = u.id
+        WHERE u.role_id IN (SELECT r.id FROM ROLE r WHERE r.code IN ('GROUP_MANAGER','EMPLOYEE'))
+        AND d.date =  STR_TO_DATE(#{time,jdbcType=VARCHAR},"%Y-%m-%d"))
+        AND u2.area_id = #{areaId}
+        AND p.manager_id = #{userId}
+    </select>
+
+    <select id="queryUserByProjectIdAndAreaId" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u.* FROM `user` u
+        LEFT JOIN `project_user` pu ON pu.user_id = u.id
+        LEFT JOIN `project` p ON pu.project_id = p.id
+        WHERE u.area_id = #{areaId}
+        AND p.id = #{projectId}
+        AND pu.create_time
+        BETWEEN DATE_FORMAT(#{startTime},'%Y-%c-%d %H:%i:%s') AND DATE_FORMAT(#{endTime},'%Y-%c-%d %H:%i:%s')
+    </select>
+
+    <select id="queryAllUserByProjectIdOrAreaId" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u.* FROM `user` u
+        LEFT JOIN `project_user` pu ON pu.user_id = u.id
+        LEFT JOIN `project` p ON pu.project_id = p.id
+        WHERE pu.create_time
+        BETWEEN DATE_FORMAT(#{startTime},'%Y-%c-%d %H:%i:%s') AND DATE_FORMAT(#{endTime},'%Y-%c-%d %H:%i:%s')
+        <if test="areaId != null and areaId.length > 0">
+            AND u.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectId != null and projectId.length > 0">
+            AND p.id IN
+            <foreach collection="projectId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="queryUserDistinct" resultType="com.nl.pm.server.registry.param.UserDistinctEntityParam">
+        SELECT DISTINCT(u.id) AS userId,u.email FROM `project` p
+        LEFT JOIN `user` u ON u.id = p.manager_id
+        WHERE p.enable = TRUE
+    </select>
+
+    <select id="queryUserDistinctByGroupId" resultType="com.nl.pm.server.registry.param.UserDistinctEntityParam">
+        SELECT DISTINCT(u.id) AS userId,u.nickname FROM `user` u
+        LEFT JOIN `project_user` pu ON pu.user_id = u.id
+        LEFT JOIN `project` p ON p.id = pu.project_id
+        WHERE p.manager_id = #{userId}
+    </select>
+
+    <select id="queryAllUserNotWriteDailyByTimeAndUserId" resultType="com.nl.pm.server.registry.entity.UserEntity">
+
+    </select>
+
+    <select id="queryUserIsProjectManager" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT DISTINCT(u.id),u.* FROM `project` p
+        LEFT JOIN `user` u ON u.id = p.manager_id
+        WHERE p.enable = TRUE
+    </select>
+
+    <select id="queryUserProjectAndDistinct" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT DISTINCT(u.id),u.* FROM `user` u WHERE u.id IN ( SELECT u2.id FROM `user` u2
+        LEFT JOIN `project` p ON p.manager_id = u2.id
+        WHERE 1 = 1
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectId != null and projectId.length > 0">
+            AND p.id IN
+            <foreach collection="projectId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        ) OR u.id IN (SELECT u3.id FROM `user` u3
+        LEFT JOIN `project_user` pu ON pu.user_id = u3.id
+        LEFT JOIN `project` p2 ON p2.id = pu.project_id
+        WHERE 1 = 1
+        <if test="areaId != null and areaId.length > 0">
+            AND p2.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectId != null and projectId.length > 0">
+            AND p2.id IN
+            <foreach collection="projectId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        )OR u.id IN (SELECT u3.id FROM `user` u3
+        LEFT JOIN `day_report` dr ON dr.user_id = u3.id
+        LEFT JOIN `day_report_task` drt ON drt.day_report_id = dr.id
+        LEFT JOIN `project` p2 ON p2.id = drt.project_id
+        WHERE 1 = 1
+        <if test="areaId != null and areaId.length > 0">
+            AND p2.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectId != null and projectId.length > 0">
+            AND p2.id IN
+            <foreach collection="projectId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        )
+    </select>
+    <select id="queryUserWorkTime" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u.*,dr.date AS workDay,drt.hours AS totalTime,drt.desc AS projectDesc FROM `day_report_task` drt
+        LEFT JOIN `day_report` dr ON  dr.id = drt.day_report_id
+        LEFT JOIN `user` u ON u.id = dr.user_id
+        LEFT JOIN `project` p ON p.id = drt.project_id
+        WHERE 1 = 1
+        <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+            AND dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+        </if>
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectName != null and projectName != ''">
+            AND p.name = #{projectName}
+        </if>
+
+    </select>
+    <select id="queryUserDistinctByTime" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u.*,a.name AS areaName FROM `user` u
+        LEFT JOIN `area` a ON a.id = u.area_id
+        WHERE u.id IN (SELECT DISTINCT(dr.user_id) FROM `day_report` dr
+        LEFT JOIN `day_report_task` drt ON drt.day_report_id = dr.id
+        LEFT JOIN `project` p ON p.id = drt.project_id
+        WHERE 1 = 1
+        <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+            AND dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+        </if>
+        <if test="projectName != null and projectName != ''">
+            AND p.name = #{projectName}
+        </if>
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        )
+    </select>
+
+    <select id="queryEveryUserTotalTime" resultType="com.nl.pm.server.registry.param.ResEveryUserTotalTimeEntityParam">
+        SELECT u.id,SUM(drt.hours) AS totalWorkTime FROM `day_report_task` drt
+        LEFT JOIN `day_report` dr ON dr.id = drt.day_report_id
+        LEFT JOIN `project` p ON p.id = drt.project_id
+        LEFT JOIN `user` u ON u.id = dr.user_id
+        WHERE 1 = 1
+        <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+            AND dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+        </if>
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectId != null and projectId.length > 0">
+            AND p.id IN
+            <foreach collection="projectId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        GROUP BY u.id,p.name
+    </select>
+    <select id="searchUserWhoCanBeAssignToProjectByAreaId"
+            resultType="com.nl.pm.server.registry.entity.UserEntity">
+
+        select
+            distinct
+            u.`id`,
+            u.`username`,
+            u.`password`,
+            u.`nickname`,
+            u.`role_id`,
+            u.`area_id`,
+            u.`email`,
+            u.`phone`,
+            u.`status`,
+            u.`email_notice`,
+            u.`create_time`,
+            u.`update_time`,
+            u.`token`,
+            r.name roleName,
+            a.name areaName
+        from `user` as u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        LEFT JOIN `area_user_ass` aua ON u.id = aua.`user_id`
+        <where>
+            u.`area_id` = #{areaId}
+            or
+            aua.`area_id` = #{areaId}
+        </where>
+        order by u.`username` asc
+
+    </select>
+    <select id="queryEveryUserHoliday" resultType="com.nl.pm.server.registry.param.ResEveryUserHolidayEntityParam">
+        SELECT dr.user_id AS id,SUM(de.leave_hour) AS holidayTime FROM `day_report` dr
+        LEFT JOIN `day_exchange` de ON de.day_report_id = dr.id
+        <where>
+            <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+                dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+            </if>
+        </where>
+        GROUP BY  dr.user_id
+
+    </select>
+    <select id="queryEveryUserHoliday2" resultType="com.nl.pm.server.registry.param.ResEveryUserHolidayEntityParam">
+        SELECT u.id,SUM(de.leave_hour) AS holidayTime FROM `day_exchange` de
+        LEFT JOIN `day_report` dr ON dr.id = de.day_report_id
+        LEFT JOIN `user` u ON dr.user_id = u.id
+        LEFT JOIN `day_report_task` drt ON drt.day_report_id = dr.id
+        LEFT JOIN `project` p ON p.id = drt.project_id
+        WHERE 1 = 1
+        <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+            AND dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+        </if>
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        <if test="projectId != null and projectId.length > 0">
+            AND p.id IN
+            <foreach collection="projectId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        GROUP BY u.id
+
+    </select>
+
+    <select id="queryProjectCountByUserId" resultType="integer">
+        SELECT COUNT(pu.id) FROM `project_user` pu WHERE pu.user_id = #{userId}
+    </select>
+    <select id="queryReportCountByUserId" resultType="integer">
+        SELECT COUNT(dr.id) FROM `day_report` dr WHERE dr.user_id = #{userId}
+    </select>
+
+    <select id="searchUserByAss" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+        u.`id`,
+        u.`username`,
+        u.`password`,
+        u.`nickname`,
+        u.`role_id`,
+        u.`area_id`,
+        u.`email`,
+        u.`phone`,
+        u.`status`,
+        u.`email_notice`,
+        u.`create_time`,
+        u.`update_time`,
+        u.`token`,
+        r.name roleName,
+        a.name areaName
+        FROM
+        `user` u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        LEFT JOIN `area_user_ass` aua ON aua.user_id = u.id
+        WHERE
+        u.status = true
+        <if test="areaId != null and areaId != ''">
+            and aua.area_id = #{areaId}
+        </if>
+        <if test="roleCode != null and roleCode.size() != 0">
+            and r.code IN
+            <foreach item="item" collection="roleCode" separator="," open="(" close=")" index="">
+                #{item}
+            </foreach>
+        </if>
+    </select>
+
+
+    <select id="getAllOtherAreaUser" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT
+        u.`id`,
+        u.`username`,
+        u.`password`,
+        u.`nickname`,
+        u.`role_id`,
+        u.`area_id`,
+        u.`email`,
+        u.`phone`,
+        u.`status`,
+        u.`email_notice`,
+        u.`create_time`,
+        u.`update_time`,
+        r.name roleName,
+        a.name areaName
+        FROM
+        `user` u
+        LEFT JOIN `role` r ON u.role_id = r.id
+        LEFT JOIN `area` a ON u.area_id = a.id
+        where u.`area_id` != #{areaId}
+
+    </select>
+    <select id="searchAreaUserCountList" resultType="com.nl.pm.server.registry.param.AreaUsersEntityParam">
+
+        select
+            a.id as areaId,
+            a.name as areaName,
+            count(u.id) as value
+        from user as u
+        left join area as a on a.id = u.area_id
+        where u.status = 1
+        group by a.name  ,a.id
+        order by count(u.id) desc
+
+
+    </select>
+
+    <select id="searchAssociatedProjectAreaList" resultType="com.nl.pm.server.registry.entity.AreaEntity">
+        select distinct a.*
+        from `area` as a
+        inner join `project` as p on p.area_id = a.id
+        inner join project_user as pu on p.id = pu.project_id
+        where pu.user_id = #{userId}
+
+    </select>
+
+    <select id="searchAssociatedOtherAreaUserList" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        select distinct u.*,a.name as areaName,r.name as roleName,r.code as roleCode
+        from user as u
+        inner join `project_user` as pu on u.id = pu.user_id
+        inner join project as p on p.id = pu.project_id
+        inner join area as a on u.area_id = a.id
+        inner join role as r on r.id = u.role_id
+        where u.area_id != #{entityParam.areaId}
+        and p.area_id = #{entityParam.areaId}
+
+    </select>
+
+    <delete id="delProjectUserByUserId">
+        DELETE FROM `project_user`
+        WHERE
+        `user_id` = #{userId}
+    </delete>
+
+    <delete id="delProjectUserByUserIdAndAreaId">
+        DELETE FROM `project_user`
+        WHERE
+        `user_id` = #{userId}
+        and `project_id` in (select id from `project` where `area_id` = #{areaId});
+
+        update project set manager_id = null
+        where manager_id = #{userId}
+        and area_id = #{areaId};
+    </delete>
+</mapper>

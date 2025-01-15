@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.nl.pm.server.registry.dao.SystemDao">
+    <select id="selectAllSystemInfo" resultType="com.nl.pm.server.registry.entity.SystemInfoEntity">
+        SELECT
+            `id`,
+            `host`,
+            `name`,
+            `passwrod`,
+            `email`,
+            `desc`,
+            `create_time` AS createTime,
+            `update_time` AS updateTime
+        FROM
+            `system_info`
+    </select>
+    <select id="querySystemInfo" resultType="com.nl.pm.server.registry.entity.SystemInfoEntity">
+        SELECT
+            `id`,
+            `host`,
+            `name`,
+            `passwrod` AS password,
+            `email`,
+            `desc`,
+            `create_time` AS createTime,
+            `update_time` AS updateTime
+        FROM
+            `system_info`
+        ORDER BY `update_time`  DESC
+        LIMIT 0, 1
+    </select>
+</mapper>

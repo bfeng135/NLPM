@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.nl.pm.server.registry.dao.DayReportDao">
+    <delete id="deleteDayReport">
+        delete from day_report_task where day_report_id = #{id};
+        delete from day_exchange where day_report_id = #{id};
+        delete from day_report where id = #{id}
+    </delete>
+
+    <select id="queryReportByProjectIdAndAreaId" resultType="java.util.Date">
+        SELECT DISTINCT(dr.date) FROM `day_report` dr
+        LEFT JOIN `user` u ON u.id = dr.user_id
+        LEFT JOIN `project_user` pu ON pu.user_id = u.id
+        LEFT JOIN `project` p ON p.id = pu.project_id
+        WHERE u.area_id = #{areaId}
+        AND p.id = #{projectId}
+        AND (dr.date BETWEEN STR_TO_DATE(#{startTime},"%Y-%m-%d") AND STR_TO_DATE(#{endTime},"%Y-%m-%d"))
+        ORDER BY dr.date DESC
+    </select>
+
+    <select id="queryReportTimeByTimeStrTest" resultType="java.util.HashMap">
+        SELECT u.*,drt.hours FROM `user` u
+        LEFT JOIN `project_user` pu ON pu.user_id = u.id
+        LEFT JOIN `day_report` dr ON dr.user_id =u.id
+        LEFT JOIN `day_report_task` drt ON drt.day_report_id = dr.id
+        WHERE u.area_id = #{areaId}
+        AND drt.project_id = #{projectId}
+        AND dr.date = STR_TO_DATE(#{timeStr,jdbcType=VARCHAR},"%Y-%m-%d")
+    </select>
+
+    <select id="queryReportTimeByTimeStr" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT u.*,drt.hours AS everyDayTime FROM `user` u
+        LEFT JOIN `project_user` pu ON pu.user_id = u.id
+        LEFT JOIN `day_report` dr ON dr.user_id =u.id
+        LEFT JOIN `day_report_task` drt ON drt.day_report_id = dr.id
+        WHERE u.area_id = #{areaId}
+        AND drt.project_id = #{projectId}
+        AND dr.date = STR_TO_DATE(#{timeStr,jdbcType=VARCHAR},"%Y-%m-%d")
+    </select>
+
+    <insert id="createDayReport" parameterType="com.nl.pm.server.registry.entity.DayReportAdvanceEntity"  useGeneratedKeys="true" keyProperty="id">
+        insert into `day_report`
+        (`date`,`user_id`)
+        values
+        (#{entity.date},#{entity.userId})
+
+    </insert>
+
+    <update id="updateDayReport" parameterType="com.nl.pm.server.registry.entity.DayReportAdvanceEntity"  useGeneratedKeys="true" keyProperty="id">
+        update `day_report`
+        set `date` = #{entity.date}
+        where `id` = #{entity.id}
+
+    </update>
+
+    <insert id="createDayReportTask" parameterType="com.nl.pm.server.registry.entity.DayReportAdvanceEntity"  useGeneratedKeys="true" keyProperty="id">
+        delete from `day_report_task` where `day_report_id` = #{entity.id};
+
+        <if test="entity.dayReportList != null and entity.dayReportList.size()>0">
+            insert into `day_report_task`
+            (`day_report_id`,`project_id`,`hours`,`desc`)
+            values
+            <foreach collection="entity.dayReportList" item="dayReport" separator="," >
+                (#{entity.id},#{dayReport.projectId},#{dayReport.hours},#{dayReport.desc})
+            </foreach>
+        </if>
+    </insert>
+
+    <insert id="createDayReportExchange" parameterType="com.nl.pm.server.registry.entity.DayReportAdvanceEntity"  useGeneratedKeys="true" keyProperty="id">
+        delete from `day_exchange` where `day_report_id` = #{entity.id};
+
+        <if test="entity.leaveEntity != null">
+            insert into `day_exchange`
+            (`day_report_id`,`leave_hour`,`desc`)
+            values
+            (#{entity.id},#{entity.leaveEntity.leaveHour},#{entity.leaveEntity.desc})
+        </if>
+    </insert>
+
+    <select id="checkDayReportExist" parameterType="map" resultType="com.nl.pm.server.registry.entity.DayReportEntity">
+        select `id`,
+                `date`,
+                `user_id`,
+                `create_time`,
+                `update_time`
+        from `day_report`
+        where DATE_FORMAT(`date`,"%Y-%m-%d") = #{date}
+        and  `user_id` = #{userId}
+    </select>
+
+    <select id="fetchDayReport" parameterType="Integer" resultType="com.nl.pm.server.registry.entity.DayReportEntity">
+        select dr.`id`,
+        dr.`date`,
+        dr.`user_id`,
+        u.`nickname` as nickname,
+        dr.`create_time`,
+        dr.`update_time`
+        from `day_report`as dr
+        left join `user` as u on u.`id` = dr.`user_id`
+        where dr.`id` = #{id}
+    </select>
+
+    <select id="fetchDayReportExchange" parameterType="Integer" resultType="com.nl.pm.server.registry.entity.DayExchangeEntity">
+        select `id`,
+        `day_report_id`,
+        `leave_hour`,
+        `desc`
+        from `day_exchange`
+        where `day_report_id` = #{id}
+    </select>
+
+    <select id="fetchDayReportTask" parameterType="Integer" resultType="com.nl.pm.server.registry.entity.DayReportTaskEntity">
+        select drt.`id`,
+        drt.`day_report_id`,
+        drt.`project_id`,
+        p.`name` as projectName,
+        drt.`hours`,
+        drt.`desc`,
+        drt.`create_time`,
+        drt.`update_time`
+        from `day_report_task` as drt
+        left join `project` as p on p.`id` = drt.`project_id`
+        where drt.`day_report_id` = #{id}
+    </select>
+
+    <select id="searchDayReport" parameterType="map" resultType="com.nl.pm.server.registry.entity.DayReportEntity">
+        select
+            distinct
+            dr.`id`,
+            dr.`date`,
+            dr.`user_id`,
+            u.`nickname` as nickname,
+            dr.`create_time`,
+            dr.`update_time`,
+            a.name AS areaName
+        from `day_report`as dr
+        left join `user` as u on u.`id` = dr.`user_id`
+        left join `area` as a on a.`id` = u.area_id
+        left join `day_report_task` as drt on drt.`day_report_id` = dr.`id`
+        left join `day_exchange` as de on de.`day_report_id` = dr.`id`
+        left join `project` as p on p.`id` = drt.`project_id`
+        <where>
+            <if test="param.userId !=null">
+              and  dr.`user_id` = #{param.userId}
+            </if>
+            <if test="param.limitUser !=null and param.limitUser.size() > 0">
+                and  dr.`user_id` in
+                <foreach collection="param.limitUser" item="userLimitId" separator="," open="(" close=")">
+                    #{userLimitId}
+                </foreach>
+            </if>
+            <if test="param.limitProject !=null and param.limitProject.size() > 0">
+                and
+                (
+                drt.`project_id` in
+                <foreach collection="param.limitProject" item="limitProjectId" separator="," open="(" close=")">
+                    #{limitProjectId}
+                </foreach>
+                or
+                de.leave_hour is not null
+                or
+                dr.`user_id` = #{param.currentUserId}
+                )
+            </if>
+            <if test="param.currentUserRoleCode == 'GROUP_MANAGER'">
+                and (
+                p.manager_id = #{param.currentUserId}
+                or dr.user_id = #{param.currentUserId}
+                )
+            </if>
+            <if test="param.projectId !=null">
+                and  drt.`project_id` = #{param.projectId}
+            </if>
+            <if test="param.startDate !=null">
+               <![CDATA[ and  dr.`date` >= #{param.startDate}  ]]>
+            </if>
+            <if test="param.endDate !=null">
+                <![CDATA[ and  dr.`date` <= #{param.endDate}  ]]>
+            </if>
+
+
+        </where>
+        order by dr.`date` desc,dr.`user_id` asc , dr.`update_time` desc
+    </select>
+
+    <select id="searchDayReportExchange" parameterType="map" resultType="com.nl.pm.server.registry.entity.DayExchangeEntity">
+        select `id`,
+        `day_report_id`,
+        `leave_hour`,
+        `desc`
+        from `day_exchange`
+        where `day_report_id` in
+        <foreach collection="dayReportIdList" item="reportId" open="(" close=")" separator="," index="" >
+            #{reportId}
+        </foreach>
+    </select>
+
+    <select id="searchDayReportTask" parameterType="map" resultType="com.nl.pm.server.registry.entity.DayReportTaskEntity">
+        select drt.`id`,
+        drt.`day_report_id`,
+        drt.`project_id`,
+        p.`name` as projectName,
+        drt.`hours`,
+        drt.`desc`,
+        drt.`create_time`,
+        drt.`update_time`,
+        a.name AS areaName
+        from `day_report_task` as drt
+        left join `project` as p on p.`id` = drt.`project_id`
+        left join `area` as a on a.`id` = p.`area_id`
+        left join `day_report` as dr on dr.`id` = drt.`day_report_id`
+        where drt.`day_report_id` in
+        <foreach collection="dayReportIdList" item="reportId" open="(" close=")" separator="," index="" >
+            #{reportId}
+        </foreach>
+        <if test="roleCode == 'GROUP_MANAGER'">
+            and (
+                p.manager_id = #{currentUserId}
+                or dr.user_id = #{currentUserId}
+            )
+        </if>
+
+    </select>
+
+    <select id="queryTimeDistinctByTime" resultType="date">
+        SELECT DISTINCT(dr.date) FROM `day_report` dr
+        LEFT JOIN `day_report_task` drt ON drt.day_report_id = dr.id
+        LEFT JOIN `project` p ON p.id = drt.project_id
+        WHERE 1 = 1
+        <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+            AND dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+        </if>
+        <if test="projectName != null and projectName != ''">
+            AND p.name = #{projectName}
+        </if>
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+    <select id="queryEveryDateWorkTotalTime" resultType="com.nl.pm.server.registry.param.ResEveryWorkTotalTimeEntityParam">
+        SELECT dr.date AS everyDate,SUM(drt.hours) AS everyWorkTotalTime FROM `day_report_task` drt
+        LEFT JOIN `day_report` dr ON dr.id = drt.day_report_id
+        LEFT JOIN `project` p ON p.id = drt.project_id
+        WHERE 1 = 1
+        <if test="startTime != null and startTime != '' and endTime != null and endTime != ''">
+            AND dr.date BETWEEN STR_TO_DATE(#{startTime}, "%Y-%m-%d") AND STR_TO_DATE(#{endTime}, "%Y-%m-%d")
+        </if>
+        <if test="projectName != null and projectName != ''">
+            AND p.name = #{projectName}
+        </if>
+        <if test="areaId != null and areaId.length > 0">
+            AND p.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")" index="">
+                #{id}
+            </foreach>
+        </if>
+        GROUP BY dr.date
+    </select>
+
+    <select id="searchDayReportByLimitUser" resultType="com.nl.pm.server.registry.entity.DayReportEntity">
+        select user_id,date from day_report
+        <where>
+            <if test="startDate !=null">
+                <![CDATA[ and  `date` >= #{startDate}  ]]>
+            </if>
+            <if test="endDate !=null">
+                <![CDATA[ and  `date` <= #{endDate}  ]]>
+            </if>
+            <if test="userId !=null">
+              and  user_id = #{userId}
+            </if>
+
+            <if test="limitUser!=null and limitUser.size() > 0">
+                and (user_id in
+                <foreach collection="limitUser" item="userLimitId" separator="," open="(" close=")">
+                    #{userLimitId}
+                </foreach>
+                )
+            </if>
+        </where>
+    </select>
+    <select id="queryCountDraftDayReportByUserId" resultType="integer">
+        SELECT COUNT(1) FROM `draft_day_report` ddr WHERE ddr.user_id = #{userId}
+    </select>
+    <select id="queryDraftDayReport" resultType="com.nl.pm.server.registry.entity.DraftDayReportEntity">
+        SELECT 	`user_id`,
+        `date`,
+        `create_time`,
+        `update_time`
+        FROM
+        `draft_day_report`
+        WHERE
+        user_id = #{userId}
+    </select>
+    <select id="queryDraftDayExchange" resultType="com.nl.pm.server.registry.entity.DraftDayExchangeEntity">
+        SELECT 	`user_id`,
+        `leave_hour`,
+        `desc`
+        FROM
+        `draft_day_exchange`
+        WHERE user_id = #{userId}
+    </select>
+    <select id="queryDraftDayReportTask" resultType="com.nl.pm.server.registry.entity.DraftDayReportTaskEntity">
+        SELECT 	`user_id`,
+        `project_id`,
+        `hours`,
+        `desc`,
+        `create_time`,
+        `update_time`
+        FROM
+        `draft_day_report_task`
+        WHERE user_id = #{userId}
+        order by `update_time` asc
+    </select>
+    <delete id="delDraft">
+        DELETE FROM `draft_day_exchange`
+        WHERE
+        `user_id` = #{userId} ;
+
+        DELETE FROM `draft_day_report`
+        WHERE
+        `user_id` = #{userId} ;
+
+        DELETE FROM `draft_day_report_task`
+        WHERE
+        `user_id` = #{userId}
+
+    </delete>
+    <insert id="saveDraft">
+        <if test="draftDayReportEntity != null">
+            INSERT INTO `draft_day_report`
+            (`user_id`,
+            `date`
+            )
+            VALUES
+            (#{draftDayReportEntity.userId},
+            #{draftDayReportEntity.date}
+            );
+        </if>
+        <if test="draftDayExchangeEntity != null">
+            INSERT INTO `nl_pm_server`.`draft_day_exchange`
+            (`user_id`,
+            `leave_hour`,
+            `desc`
+            )
+            VALUES
+            (#{draftDayExchangeEntity.userId},
+            #{draftDayExchangeEntity.leaveHour},
+            #{draftDayExchangeEntity.desc}
+            );
+        </if>
+        <if test="draftDayReportTaskEntities != null and draftDayReportTaskEntities.size() > 0">
+            INSERT INTO `nl_pm_server`.`draft_day_report_task`
+            (`user_id`,
+            `project_id`,
+            `hours`,
+            `desc`
+            )
+            VALUES
+            <foreach collection="draftDayReportTaskEntities" separator="," item="entity">
+                (#{entity.userId},#{entity.projectId},#{entity.hours},#{entity.desc})
+            </foreach>
+        </if>
+    </insert>
+
+</mapper>

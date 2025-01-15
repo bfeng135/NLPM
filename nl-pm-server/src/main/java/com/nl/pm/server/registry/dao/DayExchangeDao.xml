@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.nl.pm.server.registry.dao.DayExchangeDao">
+
+    <select id="searchDayExchangeList" parameterType="map" resultType="com.nl.pm.server.registry.entity.DayExchangeAdvanceEntity">
+
+        select `user_id`,
+            `nickname`,
+            `area_id`,
+            `area_name`,
+            `leave_hour`,
+            `work_hour`,
+            `over_hour`,
+            `exchange_hour`
+        from `user_exchange_hour`
+        <where>
+            <if test="areaId != null">
+                area_id = #{areaId}
+            </if>
+            <if test="userId != null">
+              and  user_id = #{userId}
+            </if>
+            <if test="nickname != null">
+               and nickname like concat('%', #{nickname},'%')
+            </if>
+        </where>
+
+    </select>
+    <select id="searchDetail" resultType="com.nl.pm.server.registry.entity.DayExchangeAdvanceEntity">
+
+        select
+            dr.`date`,
+            de.`leave_hour`,
+            de.`desc`
+        from `day_report` as dr
+        inner join `day_exchange` as de on dr.`id` = de.`day_report_id`
+        <where>
+            dr.`user_id` =#{userId}
+        </where>
+        order by dr.`date` desc
+    </select>
+
+    <select id="queryDistinctTime" resultType="date">
+        SELECT DISTINCT(dr.date) FROM `day_report` dr
+        LEFT JOIN `day_exchange` de ON de.day_report_id = dr.id
+        LEFT JOIN `user` u ON u.id = dr.user_id
+        WHERE dr.date BETWEEN STR_TO_DATE(#{startTime},"%Y-%m-%d") AND STR_TO_DATE(#{endTime},"%Y-%m-%d")
+        <if test="areaId != null and areaId.size() > 0">
+            AND u.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+        <if test="userId != null and userId.size() > 0">
+            AND dr.user_id IN
+            <foreach collection="userId" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+        AND de.id IS NOT NULL
+    </select>
+    <select id="queryDistinctUser" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT DISTINCT(u.id),u.* FROM `user` u
+        LEFT JOIN `day_report` dr ON dr.user_id = u.id
+        LEFT JOIN `day_exchange` de ON de.day_report_id = dr.id
+        WHERE dr.date BETWEEN STR_TO_DATE(#{startTime},"%Y-%m-%d") AND STR_TO_DATE(#{endTime},"%Y-%m-%d")
+        <if test="areaId != null and areaId.size() > 0">
+            AND u.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+        <if test="userId != null and userId.size() > 0">
+            AND u.id IN
+            <foreach collection="userId" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+        AND de.leave_hour IS NOT NULL
+    </select>
+    <select id="queryDistinctUserByTime" resultType="com.nl.pm.server.registry.entity.UserEntity">
+        SELECT dr.date AS everyLeaveTime,u.*,de.leave_hour AS everyLeaveHour FROM `user` u
+        LEFT JOIN `day_report` dr ON dr.user_id = u.id
+        LEFT JOIN `day_exchange` de ON de.day_report_id = dr.id
+        WHERE dr.date BETWEEN STR_TO_DATE(#{startTime},"%Y-%m-%d") AND STR_TO_DATE(#{endTime},"%Y-%m-%d")
+        <if test="areaId != null and areaId.size() > 0">
+            AND u.area_id IN
+            <foreach collection="areaId" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+        <if test="userId != null and userId.size() > 0">
+            AND u.id IN
+            <foreach collection="userId" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+        AND de.leave_hour IS NOT NULL
+        GROUP BY u.id,dr.date
+    </select>
+</mapper>

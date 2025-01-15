@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: 'jdbc:mysql://127.0.0.1:3306/nl_pm_server?useUnicode=true&characterEncoding=utf8&allowMultiQueries=true'
+    username: 'admin'
+    password: 'Taylor2008'
+  second-datasource:
+    url: 'jdbc:mysql://192.168.12.98:3306/cfapp_dms?useUnicode=true&characterEncoding=utf8&allowMultiQueries=true'
+    username: 'root'
+    password: '123456..'
+
+mybatis-plus:
+  configuration:
+    # 不打印sql
+    log-impl: 'org.apache.ibatis.logging.nologging.NoLoggingImpl'
+
+system:
+  crmProjectSyncUrl: 'http://127.0.0.1:8089/ADInterface/services/project/service/get'
+  syncProjectManagerEmail: 'zhyu@nltechdev.com'
+  syncProjectManagerName: '于子涵'

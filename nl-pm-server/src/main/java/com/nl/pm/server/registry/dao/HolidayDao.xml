@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.nl.pm.server.registry.dao.HolidayDao">
+    <select id="queryHolidayByDate" resultType="com.nl.pm.server.registry.entity.HolidayEntity">
+        SELECT
+            `id`,
+            `year`,
+            `month`,
+            `day`,
+            `date_ymd`,
+            `date_str`,
+            `create_time`,
+            `update_time`
+        FROM
+            `holiday`
+        WHERE `date_ymd` = STR_TO_DATE(#{date,jdbcType=VARCHAR},"%Y-%m-%d")
+    </select>
+    <select id="queryHolidayByWeek" resultType="com.nl.pm.server.registry.entity.HolidayEntity">
+        SELECT
+            `id`,
+            `year`,
+            `month`,
+            `day`,
+            `date_ymd`,
+            `date_str`,
+            `create_time`,
+            `update_time`
+        FROM
+            `holiday`
+        WHERE `date_ymd` BETWEEN STR_TO_DATE(#{date1,jdbcType=VARCHAR},"%Y-%m-%d") AND STR_TO_DATE(#{date2,jdbcType=VARCHAR},"%Y-%m-%d")
+    </select>
+    <select id="searchHolidayByDate" resultType="com.nl.pm.server.registry.entity.HolidayEntity">
+
+        SELECT
+        `id`,
+        `year`,
+        `month`,
+        `day`,
+        `date_ymd`,
+        `date_str`,
+        `create_time`,
+        `update_time`
+        FROM
+        `holiday`
+        <where>
+            <if test="startDate !=null">
+                <![CDATA[ and  `date_str` >= #{startDate}  ]]>
+            </if>
+            <if test="endDate !=null">
+                <![CDATA[ and  `date_str` <= #{endDate}  ]]>
+            </if>
+        </where>
+    </select>
+    <select id="checkHoliday" resultType="Integer">
+        select count(`id`) from `holiday` where `date_ymd` = #{date}
+
+    </select>
+    <delete id="delHolidayByDateStr">
+        DELETE FROM `holiday`
+        WHERE
+        `date_str` = #{date}
+    </delete>
+</mapper>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.nl.pm.server.registry.dao.RoleDao">
+    <select id="queryAll" resultType="com.nl.pm.server.registry.entity.RoleEntity">
+        SELECT
+            `id`,
+            `code`,
+            `name`,
+            `desc`,
+            `create_time`,
+            `update_time`
+        FROM
+            `role`
+    </select>
+    <select id="queryAllqueryAllByRoleId" resultType="com.nl.pm.server.registry.entity.RoleEntity">
+        SELECT
+            `id`,
+            `code`,
+            `name`,
+            `desc`,
+            `create_time`,
+            `update_time`
+        FROM
+            `role`
+        WHERE
+            `id`
+        IN
+            <foreach item="item" collection="roleId" separator="," open="(" close=")" index="">
+                #{item}
+            </foreach>
+        ORDER BY create_time DESC
+    </select>
+    <select id="queryRoleByRoleId" resultType="com.nl.pm.server.registry.entity.RoleEntity">
+        SELECT
+            `id`,
+            `code`,
+            `name`,
+            `desc`,
+            `create_time`,
+            `update_time`
+        FROM
+            `role`
+        WHERE id = #{roleId}
+    </select>
+    <select id="queryCountByAreaId" resultType="integer">
+        select count(temp.uid) from
+        (
+        select u.id as uid from user as u
+        left join role as r on u.role_id = r.id
+        where u.status = 1
+        and u.area_id=#{areaId}
+        and r.code ='AREA_MANAGER'
+
+        union
+
+        select a.manager_id as uid
+        from area as a
+        left join user as u on u.id = a.manager_id
+        where a.id = #{areaId}
+        and u.status = 1
+        and a.manager_id is not null
+        ) as temp
+    </select>
+</mapper>
